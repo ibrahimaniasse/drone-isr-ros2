@@ -1,0 +1,87 @@
+# ISR Drone — Paramètres centralisés Phase 1
+# Toutes les constantes du projet : pas de magic numbers dans le code
+
+drone:
+  # Pose initiale de spawn
+  spawn:
+    x: 0.0
+    y: 0.0
+    z: 1.5         # Altitude minimale pour éviter collision sol
+
+  # Inertie / physique
+  mass_kg: 1.5
+  body_size: [0.4, 0.4, 0.1]   # metres [x, y, z]
+  arm_length_m: 0.25
+
+  # Caméra nadir
+  camera:
+    width_px: 640
+    height_px: 480
+    fov_rad: 1.047   # 60 degrés
+    update_rate_hz: 10
+    clip_near_m: 0.1
+    clip_far_m: 100.0
+
+  # IMU
+  imu:
+    update_rate_hz: 100
+
+  # PosePublisher
+  pose_publisher:
+    update_frequency: 50
+    static_update_frequency: 1
+
+world:
+  name: "surveillance_zone"
+  size_m: [50.0, 50.0]
+
+  # Cibles statiques — positions [x, y, z_centre]
+  targets:
+    vehicles:
+      - name: "vehicule_bleu"
+        size: [4.0, 2.0, 1.5]
+        position: [12.0, -4.0, 0.75]
+        color: [0.1, 0.3, 0.8]
+      - name: "vehicule_rouge"
+        size: [4.0, 2.0, 1.5]
+        position: [-8.0, 10.0, 0.75]
+        color: [0.8, 0.1, 0.1]
+      - name: "vehicule_gris"
+        size: [3.0, 1.5, 1.0]
+        position: [18.0, 8.0, 0.5]
+        color: [0.5, 0.5, 0.5]
+
+    persons:
+      - name: "personne_1"
+        radius_m: 0.3
+        height_m: 1.7
+        position: [5.0, -12.0, 0.85]
+        color: [0.1, 0.7, 0.1]
+      - name: "personne_2"
+        radius_m: 0.3
+        height_m: 1.7
+        position: [-15.0, -5.0, 0.85]
+        color: [0.1, 0.7, 0.1]
+      - name: "personne_3"
+        radius_m: 0.3
+        height_m: 1.7
+        position: [10.0, 15.0, 0.85]
+        color: [0.1, 0.7, 0.1]
+
+# ROS bridge topics
+bridge:
+  camera_topic_ros: "/camera/image_raw"
+  imu_topic_ros: "/imu"
+  cmd_vel_topic_ros: "/cmd_vel"
+  odom_topic_ros: "/odom"
+  tf_static_bridge_topic: "/tf_static_bridge"
+
+# Perception pipeline — Phase 2
+drone_perception:
+  ros__parameters:
+    model_name: "yolov8n.pt"
+    confidence_threshold: 0.50
+    target_classes: ["car", "person", "truck"]
+    camera_fov_h: 1.047         # 60° en radians
+    process_every_n_frames: 1   # Pas de skip — caméra déjà à ~1.3 FPS sur ARM
+    publish_annotated_image: true

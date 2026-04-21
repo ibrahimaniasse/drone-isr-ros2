@@ -1,0 +1,31 @@
+# ISR Mission Manager parameters — VTOL zone portuaire Gennevilliers
+isr_mission_manager:
+  ros__parameters:
+    # Zone portuaire Gennevilliers
+    zone_width: 400.0
+    zone_height: 300.0
+    zone_origin_x: -200.0
+    zone_origin_y: -150.0
+
+    # Paramètres de vol VTOL
+    flight_altitude: 25.0       # AGL — meilleure résolution caméra
+    flight_speed_ms: 8.0        # croisière VTOL réaliste
+    waypoint_tolerance_m: 8.0   # tolérance plus large à haute vitesse
+    hover_on_detection_s: 0.0   # VTOL ne hovère pas — log uniquement
+    min_detection_confidence: 0.25
+    dedup_radius_m: 10.0        # zone plus large
+
+    # Trajectoire lawnmower
+    camera_fov_h: 1.047
+    strip_overlap: 0.25
+    # strip_width auto ≈ 2 * 35 * tan(0.524) * 0.75 ≈ 40m
+    # → ~10 passages pour couvrir 400m
+
+    max_mission_duration_s: 600.0  # 10 min max (MUST be float for ROS2 param type)
+
+    # Obstacles portuaires — positions réelles issues du mesh OSM
+    obstacle_xs:      [199.0, 109.6, -48.6, -133.6, -15.2, 0.0]
+    obstacle_ys:      [-73.0,  60.4, -43.9,  -73.6, -72.9, 0.0]
+    obstacle_zs:      [3.0,    3.0,   3.0,    3.0,   3.0,  3.0]
+    obstacle_radii:   [70.0,   55.0,  45.0,   40.0,  30.0, 20.0]
+    obstacle_heights: [6.0,    6.0,   6.0,    6.0,   6.0,  6.0]

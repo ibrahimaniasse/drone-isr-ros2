@@ -1,0 +1,484 @@
+<?xml version="1.0"?>
+<!--
+  Airmobi V35 VTOL ISR Drone — model.sdf
+  Gazebo Harmonic / SDF 1.9
+
+  Structure VTOL :
+    base_link        — fuselage 1.2×0.25×0.18m, 4.5 kg, blanc mat
+    wing_left/right  — ailes box 0.7×0.06×0.008m
+    tail_left/right  — empennage V box 0.25×0.04×0.006m
+    rotor_fl/fr/rl/rr — 4 nacelles VTOL + disques rotors transparents
+    pusher_prop      — hélice arrière pusher
+    camera_link      — caméra nadir 640×480, FOV 60°, 10 Hz
+    imu_link         — IMU 100 Hz
+
+  Plugins :
+    gz-sim-sensors-system (camera)
+    gz-sim-imu-system
+    gz::sim::systems::PosePublisher (TF tree)
+    gz::sim::systems::OdometryPublisher (dimensions=3)
+    gz::sim::systems::VelocityControl (cmd_vel)
+-->
+<sdf version="1.9">
+  <model name="isr_drone">
+    <static>false</static>
+
+    <!-- ========================================== -->
+    <!-- BASE LINK — Fuselage VTOL                  -->
+    <!-- ========================================== -->
+    <link name="base_link">
+      <pose>0 0 0 0 0 0</pose>
+
+      <inertial>
+        <mass>4.5</mass>
+        <inertia>
+          <!-- I = m/12 * (b² + c²) pour un box -->
+          <ixx>0.0353</ixx>   <!-- 4.5/12 * (0.25² + 0.18²) -->
+          <iyy>0.5535</iyy>   <!-- 4.5/12 * (1.2² + 0.18²) -->
+          <izz>0.5625</izz>   <!-- 4.5/12 * (1.2² + 0.25²) -->
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+
+      <!-- Fuselage principal — blanc mat -->
+      <visual name="fuselage_visual">
+        <geometry>
+          <box><size>1.2 0.25 0.18</size></box>
+        </geometry>
+        <material>
+          <ambient>0.9 0.9 0.9 1</ambient>
+          <diffuse>0.95 0.95 0.95 1</diffuse>
+          <specular>0.2 0.2 0.2 1</specular>
+        </material>
+      </visual>
+
+      <!-- Bande rouge identification sur le dessus -->
+      <visual name="stripe_visual">
+        <pose>0 0 0.091 0 0 0</pose>
+        <geometry>
+          <box><size>0.6 0.08 0.005</size></box>
+        </geometry>
+        <material>
+          <ambient>0.8 0.0 0.0 1</ambient>
+          <diffuse>0.9 0.1 0.1 1</diffuse>
+        </material>
+      </visual>
+
+      <collision name="fuselage_collision">
+        <geometry>
+          <box><size>1.2 0.25 0.18</size></box>
+        </geometry>
+      </collision>
+    </link>
+
+    <!-- ========================================== -->
+    <!-- AILES                                      -->
+    <!-- ========================================== -->
+
+    <!-- Aile gauche -->
+    <link name="wing_left">
+      <pose relative_to="base_link">-0.05 0.38 0 0 0 0</pose>
+      <inertial>
+        <mass>0.15</mass>
+        <inertia>
+          <ixx>0.00005</ixx><iyy>0.0061</iyy><izz>0.0061</izz>
+          <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <visual name="wing_left_visual">
+        <geometry>
+          <box><size>0.7 0.06 0.008</size></box>
+        </geometry>
+        <material>
+          <ambient>0.85 0.85 0.85 1</ambient>
+          <diffuse>0.9 0.9 0.9 1</diffuse>
+        </material>
+      </visual>
+    </link>
+    <joint name="wing_left_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>wing_left</child>
+    </joint>
+
+    <!-- Aile droite -->
+    <link name="wing_right">
+      <pose relative_to="base_link">-0.05 -0.38 0 0 0 0</pose>
+      <inertial>
+        <mass>0.15</mass>
+        <inertia>
+          <ixx>0.00005</ixx><iyy>0.0061</iyy><izz>0.0061</izz>
+          <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <visual name="wing_right_visual">
+        <geometry>
+          <box><size>0.7 0.06 0.008</size></box>
+        </geometry>
+        <material>
+          <ambient>0.85 0.85 0.85 1</ambient>
+          <diffuse>0.9 0.9 0.9 1</diffuse>
+        </material>
+      </visual>
+    </link>
+    <joint name="wing_right_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>wing_right</child>
+    </joint>
+
+    <!-- ========================================== -->
+    <!-- EMPENNAGE V                                -->
+    <!-- ========================================== -->
+
+    <!-- Queue gauche -->
+    <link name="tail_left">
+      <pose relative_to="base_link">-0.58 0.12 0.05 0 0 0.52</pose>
+      <inertial>
+        <mass>0.05</mass>
+        <inertia>
+          <ixx>0.00001</ixx><iyy>0.00026</iyy><izz>0.00026</izz>
+          <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <visual name="tail_left_visual">
+        <geometry>
+          <box><size>0.25 0.04 0.006</size></box>
+        </geometry>
+        <material>
+          <ambient>0.85 0.85 0.85 1</ambient>
+          <diffuse>0.9 0.9 0.9 1</diffuse>
+        </material>
+      </visual>
+    </link>
+    <joint name="tail_left_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>tail_left</child>
+    </joint>
+
+    <!-- Queue droite -->
+    <link name="tail_right">
+      <pose relative_to="base_link">-0.58 -0.12 0.05 0 0 -0.52</pose>
+      <inertial>
+        <mass>0.05</mass>
+        <inertia>
+          <ixx>0.00001</ixx><iyy>0.00026</iyy><izz>0.00026</izz>
+          <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <visual name="tail_right_visual">
+        <geometry>
+          <box><size>0.25 0.04 0.006</size></box>
+        </geometry>
+        <material>
+          <ambient>0.85 0.85 0.85 1</ambient>
+          <diffuse>0.9 0.9 0.9 1</diffuse>
+        </material>
+      </visual>
+    </link>
+    <joint name="tail_right_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>tail_right</child>
+    </joint>
+
+    <!-- ========================================== -->
+    <!-- 4 NACELLES ROTORS VTOL                     -->
+    <!-- ========================================== -->
+
+    <!-- Rotor Front-Left -->
+    <link name="rotor_fl">
+      <pose relative_to="base_link">0.1 0.65 0.02 0 0 0</pose>
+      <inertial>
+        <mass>0.03</mass>
+        <inertia>
+          <ixx>0.00001</ixx><iyy>0.00001</iyy><izz>0.00001</izz>
+          <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <!-- Nacelle -->
+      <visual name="nacelle_fl_visual">
+        <geometry>
+          <cylinder><radius>0.01</radius><length>0.08</length></cylinder>
+        </geometry>
+        <material>
+          <ambient>0.3 0.3 0.3 1</ambient>
+          <diffuse>0.4 0.4 0.4 1</diffuse>
+        </material>
+      </visual>
+      <!-- Disque rotor transparent -->
+      <visual name="disc_fl_visual">
+        <pose>0 0 0.04 0 0 0</pose>
+        <geometry>
+          <cylinder><radius>0.18</radius><length>0.005</length></cylinder>
+        </geometry>
+        <material>
+          <ambient>0.6 0.6 0.6 0.4</ambient>
+          <diffuse>0.7 0.7 0.7 0.4</diffuse>
+        </material>
+      </visual>
+    </link>
+    <joint name="rotor_fl_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>rotor_fl</child>
+    </joint>
+
+    <!-- Rotor Front-Right -->
+    <link name="rotor_fr">
+      <pose relative_to="base_link">0.1 -0.65 0.02 0 0 0</pose>
+      <inertial>
+        <mass>0.03</mass>
+        <inertia>
+          <ixx>0.00001</ixx><iyy>0.00001</iyy><izz>0.00001</izz>
+          <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <visual name="nacelle_fr_visual">
+        <geometry>
+          <cylinder><radius>0.01</radius><length>0.08</length></cylinder>
+        </geometry>
+        <material>
+          <ambient>0.3 0.3 0.3 1</ambient>
+          <diffuse>0.4 0.4 0.4 1</diffuse>
+        </material>
+      </visual>
+      <visual name="disc_fr_visual">
+        <pose>0 0 0.04 0 0 0</pose>
+        <geometry>
+          <cylinder><radius>0.18</radius><length>0.005</length></cylinder>
+        </geometry>
+        <material>
+          <ambient>0.6 0.6 0.6 0.4</ambient>
+          <diffuse>0.7 0.7 0.7 0.4</diffuse>
+        </material>
+      </visual>
+    </link>
+    <joint name="rotor_fr_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>rotor_fr</child>
+    </joint>
+
+    <!-- Rotor Rear-Left -->
+    <link name="rotor_rl">
+      <pose relative_to="base_link">-0.2 0.65 0.02 0 0 0</pose>
+      <inertial>
+        <mass>0.03</mass>
+        <inertia>
+          <ixx>0.00001</ixx><iyy>0.00001</iyy><izz>0.00001</izz>
+          <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <visual name="nacelle_rl_visual">
+        <geometry>
+          <cylinder><radius>0.01</radius><length>0.08</length></cylinder>
+        </geometry>
+        <material>
+          <ambient>0.3 0.3 0.3 1</ambient>
+          <diffuse>0.4 0.4 0.4 1</diffuse>
+        </material>
+      </visual>
+      <visual name="disc_rl_visual">
+        <pose>0 0 0.04 0 0 0</pose>
+        <geometry>
+          <cylinder><radius>0.18</radius><length>0.005</length></cylinder>
+        </geometry>
+        <material>
+          <ambient>0.6 0.6 0.6 0.4</ambient>
+          <diffuse>0.7 0.7 0.7 0.4</diffuse>
+        </material>
+      </visual>
+    </link>
+    <joint name="rotor_rl_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>rotor_rl</child>
+    </joint>
+
+    <!-- Rotor Rear-Right -->
+    <link name="rotor_rr">
+      <pose relative_to="base_link">-0.2 -0.65 0.02 0 0 0</pose>
+      <inertial>
+        <mass>0.03</mass>
+        <inertia>
+          <ixx>0.00001</ixx><iyy>0.00001</iyy><izz>0.00001</izz>
+          <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <visual name="nacelle_rr_visual">
+        <geometry>
+          <cylinder><radius>0.01</radius><length>0.08</length></cylinder>
+        </geometry>
+        <material>
+          <ambient>0.3 0.3 0.3 1</ambient>
+          <diffuse>0.4 0.4 0.4 1</diffuse>
+        </material>
+      </visual>
+      <visual name="disc_rr_visual">
+        <pose>0 0 0.04 0 0 0</pose>
+        <geometry>
+          <cylinder><radius>0.18</radius><length>0.005</length></cylinder>
+        </geometry>
+        <material>
+          <ambient>0.6 0.6 0.6 0.4</ambient>
+          <diffuse>0.7 0.7 0.7 0.4</diffuse>
+        </material>
+      </visual>
+    </link>
+    <joint name="rotor_rr_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>rotor_rr</child>
+    </joint>
+
+    <!-- ========================================== -->
+    <!-- HÉLICE PUSHER ARRIÈRE                      -->
+    <!-- ========================================== -->
+    <link name="pusher_prop">
+      <pose relative_to="base_link">-0.62 0 0 0 1.5708 0</pose>
+      <inertial>
+        <mass>0.02</mass>
+        <inertia>
+          <ixx>0.00001</ixx><iyy>0.00001</iyy><izz>0.00001</izz>
+          <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+        </inertia>
+      </inertial>
+      <visual name="pusher_visual">
+        <geometry>
+          <cylinder><radius>0.15</radius><length>0.02</length></cylinder>
+        </geometry>
+        <material>
+          <ambient>0.5 0.5 0.5 0.6</ambient>
+          <diffuse>0.6 0.6 0.6 0.6</diffuse>
+        </material>
+      </visual>
+    </link>
+    <joint name="pusher_prop_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>pusher_prop</child>
+    </joint>
+
+    <!-- ========================================== -->
+    <!-- CAMÉRA NADIR                               -->
+    <!-- ========================================== -->
+    <link name="camera_link">
+      <!-- Sous le fuselage, pointant vers le bas (rotation 90° en pitch) -->
+      <pose relative_to="base_link">0.1 0 -0.1 0 1.5708 0</pose>
+
+      <inertial>
+        <mass>0.05</mass>
+        <inertia>
+          <ixx>0.00001</ixx><iyy>0.00001</iyy><izz>0.00001</izz>
+          <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+        </inertia>
+      </inertial>
+
+      <visual name="camera_visual">
+        <geometry>
+          <box><size>0.03 0.03 0.03</size></box>
+        </geometry>
+        <material>
+          <ambient>0.1 0.1 0.8 1</ambient>
+          <diffuse>0.2 0.2 0.9 1</diffuse>
+        </material>
+      </visual>
+
+      <sensor name="camera" type="camera">
+        <always_on>true</always_on>
+        <update_rate>10</update_rate>
+        <visualize>true</visualize>
+        <camera>
+          <horizontal_fov>1.047</horizontal_fov>
+          <image>
+            <width>640</width>
+            <height>480</height>
+            <format>R8G8B8</format>
+          </image>
+          <clip>
+            <near>0.1</near>
+            <far>200</far>
+          </clip>
+        </camera>
+      </sensor>
+    </link>
+    <joint name="camera_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>camera_link</child>
+    </joint>
+
+    <!-- ========================================== -->
+    <!-- IMU                                        -->
+    <!-- ========================================== -->
+    <link name="imu_link">
+      <pose relative_to="base_link">0 0 0 0 0 0</pose>
+
+      <inertial>
+        <mass>0.01</mass>
+        <inertia>
+          <ixx>0.00001</ixx><iyy>0.00001</iyy><izz>0.00001</izz>
+          <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+        </inertia>
+      </inertial>
+
+      <sensor name="imu" type="imu">
+        <always_on>true</always_on>
+        <update_rate>100</update_rate>
+        <imu>
+          <angular_velocity>
+            <x><noise type="gaussian"><mean>0</mean><stddev>0.0002</stddev></noise></x>
+            <y><noise type="gaussian"><mean>0</mean><stddev>0.0002</stddev></noise></y>
+            <z><noise type="gaussian"><mean>0</mean><stddev>0.0002</stddev></noise></z>
+          </angular_velocity>
+          <linear_acceleration>
+            <x><noise type="gaussian"><mean>0</mean><stddev>0.017</stddev></noise></x>
+            <y><noise type="gaussian"><mean>0</mean><stddev>0.017</stddev></noise></y>
+            <z><noise type="gaussian"><mean>0</mean><stddev>0.017</stddev></noise></z>
+          </linear_acceleration>
+        </imu>
+      </sensor>
+    </link>
+    <joint name="imu_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>imu_link</child>
+    </joint>
+
+    <!-- ========================================== -->
+    <!-- PLUGINS                                    -->
+    <!-- ========================================== -->
+
+    <!-- Camera sensor system -->
+    <plugin filename="gz-sim-sensors-system"
+            name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+
+    <!-- IMU sensor system -->
+    <plugin filename="gz-sim-imu-system"
+            name="gz::sim::systems::Imu"/>
+
+    <!-- PosePublisher — publie les TFs du modèle vers Gazebo transport -->
+    <plugin filename="gz-sim-pose-publisher-system"
+            name="gz::sim::systems::PosePublisher">
+      <publish_link_pose>true</publish_link_pose>
+      <publish_sensor_pose>true</publish_sensor_pose>
+      <publish_collision_pose>false</publish_collision_pose>
+      <publish_visual_pose>false</publish_visual_pose>
+      <publish_nested_model_pose>false</publish_nested_model_pose>
+      <static_publisher>true</static_publisher>
+      <static_update_frequency>1</static_update_frequency>
+      <update_frequency>50</update_frequency>
+    </plugin>
+
+    <!-- OdometryPublisher — publie l'odom du drone -->
+    <plugin filename="gz-sim-odometry-publisher-system"
+            name="gz::sim::systems::OdometryPublisher">
+      <odom_frame>odom</odom_frame>
+      <robot_base_frame>base_link</robot_base_frame>
+      <odom_publish_frequency>50</odom_publish_frequency>
+      <dimensions>3</dimensions>
+    </plugin>
+
+    <!-- VelocityControl — contrôle cmd_vel direct -->
+    <plugin filename="gz-sim-velocity-control-system"
+            name="gz::sim::systems::VelocityControl">
+      <topic>/model/isr_drone/cmd_vel</topic>
+    </plugin>
+
+  </model>
+</sdf>

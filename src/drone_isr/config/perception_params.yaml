@@ -1,0 +1,10 @@
+# Perception node ROS2 parameters
+# Fichier séparé car isr_params.yaml contient des sections non-ROS2
+drone_perception:
+  ros__parameters:
+    model_name: "yolov8n.pt"
+    confidence_threshold: 0.25
+    target_classes: ["car", "person", "truck"]
+    camera_fov_h: 1.047
+    process_every_n_frames: 1
+    publish_annotated_image: true
