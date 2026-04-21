@@ -22,12 +22,7 @@ WORKDIR $WORKSPACE
 # Copy the source code
 COPY ./src $WORKSPACE/src
 
-# Install ROS2 dependencies using rosdep
-RUN apt-get update && rosdep update && rosdep install -y \
-    --from-paths src \
-    --ignore-src \
-    --rosdistro humble \
-    && rm -rf /var/lib/apt/lists/*
+
 
 # Build the workspace
 RUN /bin/bash -c "source /opt/ros/humble/setup.bash && colcon build --symlink-install"

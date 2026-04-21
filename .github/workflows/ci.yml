@@ -37,7 +37,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest numpy opencv-python-headless
       - name: Run Pytest
-        run: pytest src/drone_isr/test/ --tb=short -v
+        run: PYTHONPATH=src/drone_isr:$PYTHONPATH pytest src/drone_isr/test/ --tb=short -v
 
   build-docker:
     runs-on: ubuntu-latest

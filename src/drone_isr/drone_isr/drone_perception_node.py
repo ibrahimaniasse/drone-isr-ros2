@@ -18,12 +18,7 @@ from cv_bridge import CvBridge
 
 from drone_isr_msgs.msg import Detection, DetectionArray
 
-from drone_isr.perception_utils import (
-    DetectionResult,
-    draw_detections,
-    estimate_world_position,
-    run_detection,
-)
+from drone_isr.perception_utils import DetectionResult, draw_detections, estimate_world_position, run_detection
 
 
 class DronePerceptionNode(Node):
