@@ -252,3 +252,133 @@ def filter_low_confidence(
         Liste filtrée (nouvelles instances, pas de mutation).
     """
     return [d for d in detections if d.confidence >= min_confidence]
+
+
+# ---------------------------------------------------------------------------
+# HSV detection — pour simulation Gazebo (remplace YOLOv8 sur les boîtes colorées)
+# Couleurs issues de surveillance_zone.sdf / isr_params.yaml :
+#   vehicule_bleu  [0.1, 0.3, 0.8] → HSV H≈[200,240]
+#   vehicule_rouge [0.8, 0.1, 0.1] → HSV H≈[0,10] + [170,180]
+#   vehicule_gris  [0.5, 0.5, 0.5] → HSV S≈0 (gris)
+#   personne       [0.1, 0.7, 0.1] → HSV H≈[90,130]
+# ---------------------------------------------------------------------------
+
+_HSV_TARGETS = [
+    {
+        'label': 'vehicle',
+        'conf': 0.82,
+        'ranges': [
+            # Bleu
+            (np.array([100, 100, 80],  dtype=np.uint8),
+             np.array([130, 255, 255], dtype=np.uint8)),
+        ],
+    },
+    {
+        'label': 'vehicle',
+        'conf': 0.85,
+        'ranges': [
+            # Rouge (bas)
+            (np.array([0,   100, 80],  dtype=np.uint8),
+             np.array([10,  255, 255], dtype=np.uint8)),
+            # Rouge (haut)
+            (np.array([170, 100, 80],  dtype=np.uint8),
+             np.array([180, 255, 255], dtype=np.uint8)),
+        ],
+    },
+    {
+        'label': 'vehicle',
+        'conf': 0.70,
+        'ranges': [
+            # Gris (faible saturation, valeur moyenne)
+            (np.array([0,   0,  90],  dtype=np.uint8),
+             np.array([180, 40, 180], dtype=np.uint8)),
+        ],
+    },
+    {
+        'label': 'person',
+        'conf': 0.78,
+        'ranges': [
+            # Vert (personnes)
+            (np.array([40,  80, 60],  dtype=np.uint8),
+             np.array([80, 255, 255], dtype=np.uint8)),
+        ],
+    },
+]
+
+_MIN_CONTOUR_AREA = 120   # pixels² — filtre le bruit
+
+
+def detect_targets_hsv(image: np.ndarray) -> list[DetectionResult]:
+    """Détecte les cibles colorées (véhicules + personnes) par segmentation HSV.
+
+    Remplace YOLOv8 pour la simulation Gazebo où les objets sont des boîtes colorées.
+
+    Args:
+        image: Image BGR (H, W, 3).
+
+    Returns:
+        Liste de DetectionResult (coordonnées pixel, pas encore de position monde).
+    """
+    if image is None or image.size == 0:
+        return []
+
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    results: list[DetectionResult] = []
+
+    for target in _HSV_TARGETS:
+        # Construire le masque (union de toutes les plages HSV de ce target)
+        mask = np.zeros(hsv.shape[:2], dtype=np.uint8)
+        for (lo, hi) in target['ranges']:
+            mask |= cv2.inRange(hsv, lo, hi)
+
+        # Morphologie pour combler les trous
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN,  kernel)
+
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        for cnt in contours:
+            area = cv2.contourArea(cnt)
+            if area < _MIN_CONTOUR_AREA:
+                continue
+
+            x, y, w, h = cv2.boundingRect(cnt)
+            results.append(DetectionResult(
+                x_min=x, y_min=y,
+                x_max=x + w, y_max=y + h,
+                label=target['label'],
+                confidence=target['conf'],
+            ))
+
+    # Dédupliquer par IoU (même boîte détectée par deux plages de couleur)
+    return _nms_detections(results, iou_threshold=0.4)
+
+
+def _iou(a: DetectionResult, b: DetectionResult) -> float:
+    """Intersection-over-Union entre deux bboxes."""
+    ix1 = max(a.x_min, b.x_min)
+    iy1 = max(a.y_min, b.y_min)
+    ix2 = min(a.x_max, b.x_max)
+    iy2 = min(a.y_max, b.y_max)
+    inter = max(0, ix2 - ix1) * max(0, iy2 - iy1)
+    if inter == 0:
+        return 0.0
+    area_a = (a.x_max - a.x_min) * (a.y_max - a.y_min)
+    area_b = (b.x_max - b.x_min) * (b.y_max - b.y_min)
+    return inter / (area_a + area_b - inter)
+
+
+def _nms_detections(
+    detections: list[DetectionResult],
+    iou_threshold: float = 0.4,
+) -> list[DetectionResult]:
+    """Greedy NMS — supprime les doublons par IoU."""
+    if not detections:
+        return []
+    sorted_dets = sorted(detections, key=lambda d: d.confidence, reverse=True)
+    kept: list[DetectionResult] = []
+    for det in sorted_dets:
+        if all(_iou(det, k) < iou_threshold for k in kept):
+            kept.append(det)
+    return kept

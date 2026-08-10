@@ -2,17 +2,18 @@
 """
 simulation.launch.py — Phase 1 ISR Drone
 
-Ordre de démarrage (avec corrections appliquées) :
+Ordre de démarrage (timers calibrés UTM/ARM) :
   1. gz sim surveillance_zone.sdf     (drone inclus dans le world, pas de spawn séparé)
-  2. ros_gz_bridge                     (bridge.yaml)
-  3. tf_static_republisher             (VOLATILE → TRANSIENT_LOCAL)
-  4. rviz2                             (rviz2_config.rviz)
+  2. ros_gz_bridge                     (bridge.yaml)          @ 10s
+  3. tf_static_republisher             (TRANSIENT_LOCAL)      @ 15s
+  4. rviz2                             (rviz2_config.rviz)    @ 20s (optionnel)
 
 Corrections vs plan initial :
   - Pas de gz_spawn_entity (Bug #5 — double spawn)
   - Pas de static_transform_publisher odom→base_link (TF dynamique via bridge)
   - Pas de robot_state_publisher (pas de URDF, PosePublisher + relay suffisent)
   - GZ_SIM_RESOURCE_PATH défini pour que le world SDF trouve model://isr_drone
+  - IfCondition sur RViz (use_rviz=false pour demo_mission.launch.py)
 """
 import os
 
@@ -24,6 +25,7 @@ from launch.actions import (
     SetEnvironmentVariable,
     TimerAction,
 )
+from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
@@ -66,15 +68,15 @@ def generate_launch_description() -> LaunchDescription:
     # --- 1. Gazebo Sim Harmonic ---
     gz_sim = ExecuteProcess(
         cmd=[
-            'gz', 'sim', '-r', world_path,
+            'gz', 'sim', '-r', '-v', '3', world_path,
         ],
         output='screen',
         additional_env={'GZ_SIM_RESOURCE_PATH': new_gz_path},
     )
 
-    # --- 2. ROS ↔ Gz Bridge (délai 5s après Gazebo) ---
+    # --- 2. ROS ↔ Gz Bridge (10s — ARM/UTM plus lent) ---
     bridge = TimerAction(
-        period=5.0,
+        period=10.0,
         actions=[
             Node(
                 package='ros_gz_bridge',
@@ -86,12 +88,12 @@ def generate_launch_description() -> LaunchDescription:
         ],
     )
 
-    # --- 3. TF Static Publisher (délai 7s) ---
+    # --- 3. TF Static Publisher (15s) ---
     # Publie les transforms statiques directement depuis les données SDF.
     # Le bridge Pose_V → TFMessage est cassé sur Jazzy/Harmonic
     # (topic créé mais aucune donnée publiée).
     tf_static_pub = TimerAction(
-        period=7.0,
+        period=15.0,
         actions=[
             Node(
                 package='drone_isr',
@@ -110,9 +112,9 @@ def generate_launch_description() -> LaunchDescription:
         ],
     )
 
-    # --- 4. RViz2 (délai 9s) ---
+    # --- 4. RViz2 (20s, conditionnel) ---
     rviz = TimerAction(
-        period=9.0,
+        period=20.0,
         actions=[
             Node(
                 package='rviz2',
@@ -121,7 +123,7 @@ def generate_launch_description() -> LaunchDescription:
                 arguments=['-d', rviz_config],
                 parameters=[{'use_sim_time': True}],
                 output='screen',
-                condition=None,  # TODO: condition on use_rviz if needed
+                condition=IfCondition(use_rviz),
             ),
         ],
     )

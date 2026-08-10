@@ -1,0 +1,44 @@
+# ISR Drone — Paramètres démo (zone réduite adaptée au monde Gazebo)
+# Zone réelle mission : 400m × 300m / altitude 25m / 38 waypoints
+# Zone démo simulation : 45m × 40m / altitude 5m / couvre toutes les cibles SDF
+
+isr_mission_manager:
+  ros__parameters:
+    # Zone couvrant les cibles SDF (véhicules à ±18m, personnes à ±15m)
+    zone_width: 45.0
+    zone_height: 40.0
+    zone_origin_x: -22.5
+    zone_origin_y: -20.0
+
+    # Paramètres de vol démo (bas + lent = bien visible en RViz)
+    flight_altitude: 5.0        # AGL — cibles bien visibles à basse altitude
+    flight_speed_ms: 3.0        # Lent pour la démo
+    waypoint_tolerance_m: 1.0
+    hover_on_detection_s: 0.0
+    min_detection_confidence: 0.15   # Bas pour HSV simulation
+    dedup_radius_m: 3.0
+
+    # Trajectoire lawnmower
+    # strip_width = 2 * 5 * tan(0.524) * (1-0.20) ≈ 4.6m
+    # n_strips = ceil(45 / 4.6) = 10 → 20 waypoints (démo rapide)
+    camera_fov_h: 1.047
+    strip_overlap: 0.20
+
+    max_mission_duration_s: 300.0
+
+    # Pas d'obstacles en démo (zone simplifiée)
+    obstacle_xs: [-999.0]
+    obstacle_ys: [-999.0]
+    obstacle_zs: [-999.0]
+    obstacle_radii: [-999.0]
+    obstacle_heights: [-999.0]
+
+drone_perception:
+  ros__parameters:
+    use_hsv_detection: true          # Mode simulation Gazebo
+    model_name: "yolov8n.pt"
+    confidence_threshold: 0.15
+    target_classes: ["car", "person", "truck", "vehicle"]
+    camera_fov_h: 1.047
+    process_every_n_frames: 1
+    publish_annotated_image: true

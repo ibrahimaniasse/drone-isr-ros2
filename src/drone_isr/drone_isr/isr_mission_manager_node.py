@@ -153,26 +153,29 @@ class ISRMissionManagerNode(Node):
         self.get_logger().info(f"[OPERATOR COMMAND] received: '{cmd}'")
         
         if cmd == "land":
-            self.get_logger().warn("Operator requested direct LAND.")
+            self.get_logger().warn("[ISR Mission] Operator command: LAND requested.")
+            self.get_logger().info(f'[ISR Mission] State: {self._state} -> LAND')
             self._state = self.State.LAND
-            
+
         elif cmd == "return":
             if self._state not in [self.State.GROUNDED, self.State.TAKEOFF, self.State.LAND, self.State.COMPLETE]:
-                self.get_logger().info("Returning to Loiter position.")
+                self.get_logger().info(f'[ISR Mission] State: {self._state} -> AWAITING_COMMAND')
                 self._state = self.State.AWAITING_COMMAND
-                
+
         elif cmd.startswith("inspect "):
             try:
                 target_id = int(cmd.split(" ")[1])
                 target = next((t for t in self._seen_targets if t[0] == target_id), None)
                 if target:
                     self._target_to_inspect = (target[1], target[2])
-                    self.get_logger().info(f"Diving to inspect target ID {target_id} ({target[3]})")
+                    self.get_logger().info(
+                        f'[ISR Mission] State: AWAITING_COMMAND -> INSPECTING '
+                        f'(target {target_id}: {target[3]})')
                     self._state = self.State.INSPECTING
                 else:
-                    self.get_logger().error(f"Target ID {target_id} not found.")
+                    self.get_logger().error(f"[ISR Mission] Target ID {target_id} not found.")
             except (ValueError, IndexError):
-                self.get_logger().error("Invalid inspect command. Use 'inspect <ID>'.")
+                self.get_logger().error("[ISR Mission] Invalid command. Use 'inspect <ID>'.")
 
     def _detections_cb(self, msg: DetectionArray) -> None:
         if self._state in [self.State.GROUNDED, self.State.TAKEOFF, self.State.LAND, self.State.COMPLETE]:
@@ -204,8 +207,8 @@ class ISRMissionManagerNode(Node):
                     self.alerts_pub.publish(alert)
 
                     self.get_logger().warn(
-                        f'NEW TARGET [{t_id}]: {det.label} (conf={det.confidence:.2f}) '
-                        f'at ({det.world_x:.1f}, {det.world_y:.1f})'
+                        f'[ISR Mission] NEW TARGET [{t_id}]: {det.label} '
+                        f'(conf={det.confidence:.2f}) at ({det.world_x:.1f}, {det.world_y:.1f})'
                     )
                     # On ne s'arrête pas, on continue la mission !
 
@@ -222,9 +225,9 @@ class ISRMissionManagerNode(Node):
         self._publish_rviz_markers()
 
         if self._state == self.State.GROUNDED:
-            # Attend ~3 secondes avant de décoller (Odom(50Hz) = 150 ticks)
+            # Attend ~3 secondes avant de décoller (Odom @ 50Hz = 150 ticks)
             if self._ticks > 150:
-                self.get_logger().info('Transition to TAKEOFF')
+                self.get_logger().info('[ISR Mission] State: GROUNDED -> TAKEOFF')
                 self._state = self.State.TAKEOFF
             else:
                 self.cmd_vel_pub.publish(Twist())
@@ -233,14 +236,19 @@ class ISRMissionManagerNode(Node):
             target_alt = self._flight_altitude * 0.975
             safety_cap = self._flight_altitude * 2.0
             if self._ticks % 50 == 0:
-                self.get_logger().info(f'TAKEOFF altitude: {self._pose_z:.2f}m / {target_alt:.1f}m')
-            
+                self.get_logger().info(
+                    f'[ISR Mission] TAKEOFF — altitude: {self._pose_z:.1f}m / {target_alt:.1f}m')
+
             if self._pose_z > safety_cap:
-                self.get_logger().error('SAFETY: altitude cap reached, forcing SEARCHING')
+                self.get_logger().error('[ISR Mission] SAFETY: altitude cap — forcing SEARCHING')
+                self.get_logger().info('[ISR Mission] State: TAKEOFF -> SEARCHING')
                 self._state = self.State.SEARCHING
-                
+
             elif self._pose_z > target_alt:
-                self.get_logger().info('Takeoff complete. Sweeping zone (SEARCHING)...')
+                self.get_logger().info(
+                    f'[ISR Mission] Takeoff complete at {self._pose_z:.1f}m. '
+                    f'Lawnmower: {len(self._waypoints)} waypoints, 85% coverage target.')
+                self.get_logger().info('[ISR Mission] State: TAKEOFF -> SEARCHING')
                 self._state = self.State.SEARCHING
             else:
                 twist = Twist()
@@ -249,14 +257,19 @@ class ISRMissionManagerNode(Node):
 
         elif self._state == self.State.SEARCHING:
             if self._current_wp_idx >= len(self._waypoints):
-                self.get_logger().info('Search pattern complete. Transition to AWAITING_COMMAND.')
+                self.get_logger().info(
+                    f'[ISR Mission] Search complete. {len(self._seen_targets)} targets identified.')
+                self.get_logger().info('[ISR Mission] State: SEARCHING -> AWAITING_COMMAND')
                 self._state = self.State.AWAITING_COMMAND
                 return
 
             wp = self._waypoints[self._current_wp_idx]
             reached = self._drive_to(wp.x, wp.y, wp.z, self._wp_tolerance, self._flight_speed)
             if reached:
-                self.get_logger().info(f'Waypoint {self._current_wp_idx + 1}/{len(self._waypoints)} reached.')
+                pct = int(100.0 * self._current_wp_idx / len(self._waypoints))
+                self.get_logger().info(
+                    f'[ISR Mission] Waypoint {self._current_wp_idx + 1}/{len(self._waypoints)} reached. '
+                    f'Zone coverage: {pct}%')
                 self._current_wp_idx += 1
 
         elif self._state == self.State.AWAITING_COMMAND:
@@ -264,28 +277,43 @@ class ISRMissionManagerNode(Node):
             center_x = self._zone.origin_x + self._zone.width / 2.0
             center_y = self._zone.origin_y + self._zone.height / 2.0
             self._drive_to(center_x, center_y, self._flight_altitude, 0.5, self._flight_speed)
+            if self._ticks % 200 == 0:
+                self.get_logger().info(
+                    f'[ISR Mission] AWAITING_COMMAND. {len(self._seen_targets)} targets logged. '
+                    f'Send "inspect <ID>" or "land".')
 
         elif self._state == self.State.INSPECTING:
             # S'approche de la cible ciblée
             if self._target_to_inspect:
                 tx, ty = self._target_to_inspect
-                self._drive_to(tx, ty, 3.0, 0.5, self._flight_speed)
+                reached = self._drive_to(tx, ty, 3.0, 0.5, self._flight_speed)
+                if reached:
+                    self.get_logger().info(
+                        f'[ISR Mission] Inspection complete at ({tx:.1f}, {ty:.1f}). '
+                        f'Returning to loiter.')
+                    self.get_logger().info('[ISR Mission] State: INSPECTING -> AWAITING_COMMAND')
+                    self._target_to_inspect = None
+                    self._state = self.State.AWAITING_COMMAND
             else:
                 self._state = self.State.AWAITING_COMMAND
-                
+
         elif self._state == self.State.LAND:
             if self._pose_z <= 0.2:
-                self.get_logger().info(f'MISSION COMPLETE. Total targets: {len(self._seen_targets)}')
+                self.get_logger().info('[ISR Mission] State: LAND -> COMPLETE')
+                self.get_logger().info(
+                    f'[ISR Mission] Mission complete. {len(self._seen_targets)} targets identified.')
                 alert = Alert(alert_type="MISSION_COMPLETE")
                 alert.stamp = self.get_clock().now().to_msg()
                 self.alerts_pub.publish(alert)
-                self.cmd_vel_pub.publish(Twist()) 
+                self.cmd_vel_pub.publish(Twist())
                 self._state = self.State.COMPLETE
             else:
+                if self._ticks % 50 == 0:
+                    self.get_logger().info(f'[ISR Mission] LAND — altitude: {self._pose_z:.1f}m')
                 twist = Twist()
                 twist.linear.z = -1.0
                 self.cmd_vel_pub.publish(twist)
-                
+
         elif self._state == self.State.COMPLETE:
             self.cmd_vel_pub.publish(Twist())
 

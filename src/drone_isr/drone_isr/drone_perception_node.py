@@ -9,6 +9,12 @@ Subscribe :
 Publish :
     /detections        (drone_isr_msgs/DetectionArray)
     /camera/annotated  (sensor_msgs/Image)
+
+Stratégie de détection (simulation Gazebo) :
+  1. Tente de charger YOLOv8. Si import échoue → mode HSV automatique.
+  2. En mode HSV, détecte véhicules bleu/rouge/gris et personnes vertes.
+  3. En mode YOLO, utilise YOLO (fonctionne en conditions réelles).
+  Paramètre 'use_hsv_detection: true' force le mode HSV.
 """
 import rclpy
 from rclpy.node import Node
@@ -18,11 +24,17 @@ from cv_bridge import CvBridge
 
 from drone_isr_msgs.msg import Detection, DetectionArray
 
-from drone_isr.perception_utils import DetectionResult, draw_detections, estimate_world_position, run_detection
+from drone_isr.perception_utils import (
+    DetectionResult,
+    draw_detections,
+    estimate_world_position,
+    run_detection,
+    detect_targets_hsv,
+)
 
 
 class DronePerceptionNode(Node):
-    """Perception pipeline : camera → YOLOv8 → detections + annotated image."""
+    """Perception pipeline : camera → YOLOv8 / HSV → detections + annotated image."""
 
     def __init__(self) -> None:
         super().__init__('drone_perception')
@@ -34,6 +46,8 @@ class DronePerceptionNode(Node):
         self.declare_parameter('camera_fov_h', 1.047)
         self.declare_parameter('process_every_n_frames', 1)
         self.declare_parameter('publish_annotated_image', True)
+        # use_hsv_detection=true → force HSV (simulation Gazebo). False → tente YOLO.
+        self.declare_parameter('use_hsv_detection', True)
 
         self._model_name: str = self.get_parameter('model_name').value
         self._conf_threshold: float = self.get_parameter('confidence_threshold').value
@@ -41,9 +55,11 @@ class DronePerceptionNode(Node):
         self._camera_fov_h: float = self.get_parameter('camera_fov_h').value
         self._process_every_n: int = self.get_parameter('process_every_n_frames').value
         self._publish_annotated: bool = self.get_parameter('publish_annotated_image').value
+        self._use_hsv: bool = self.get_parameter('use_hsv_detection').value
 
         # --- Lazy model loading ---
         self._model = None
+        self._yolo_unavailable: bool = False   # True si import ultralytics a échoué
         self._frame_count: int = 0
         self._bridge = CvBridge()
 
@@ -64,8 +80,9 @@ class DronePerceptionNode(Node):
         self.detections_pub = self.create_publisher(DetectionArray, '/detections', 10)
         self.annotated_pub = self.create_publisher(Image, '/camera/annotated', 10)
 
+        mode_str = 'HSV (simulation)' if self._use_hsv else f'YOLO:{self._model_name}'
         self.get_logger().info(
-            f'Perception node started — model={self._model_name}, '
+            f'Perception node started — mode={mode_str}, '
             f'conf={self._conf_threshold}, '
             f'process_every={self._process_every_n}'
         )
@@ -78,11 +95,14 @@ class DronePerceptionNode(Node):
             self._model = YOLO(self._model_name)
             self.get_logger().info('YOLOv8 model loaded successfully')
         except ImportError:
-            self.get_logger().error(
-                'ultralytics not installed. Run: pip3 install ultralytics'
-            )
+            self.get_logger().warn(
+                'ultralytics not installed — switching to HSV detection mode.')
+            self._yolo_unavailable = True
+            self._use_hsv = True
         except Exception as e:
-            self.get_logger().error(f'Failed to load model: {e}')
+            self.get_logger().warn(f'YOLOv8 load failed ({e}) — switching to HSV detection.')
+            self._yolo_unavailable = True
+            self._use_hsv = True
 
     def _odom_cb(self, msg: Odometry) -> None:
         """Met à jour la position et altitude du drone."""
@@ -98,12 +118,6 @@ class DronePerceptionNode(Node):
         if self._frame_count % self._process_every_n != 0:
             return
 
-        # Lazy loading du modèle
-        if self._model is None:
-            self._load_model()
-            if self._model is None:
-                return
-
         # Conversion ROS Image → OpenCV BGR
         try:
             cv_image = self._bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
@@ -113,13 +127,24 @@ class DronePerceptionNode(Node):
 
         image_h, image_w = cv_image.shape[:2]
 
-        # --- Inférence YOLOv8 ---
-        detections = run_detection(
-            self._model,
-            cv_image,
-            conf_threshold=self._conf_threshold,
-            target_classes=self._target_classes,
-        )
+        # --- Détection : HSV (simulation) ou YOLOv8 (réel) ---
+        if self._use_hsv:
+            # Mode simulation Gazebo : détection couleur HSV
+            detections = detect_targets_hsv(cv_image)
+        else:
+            # Mode réel : YOLOv8 (lazy load)
+            if self._model is None and not self._yolo_unavailable:
+                self._load_model()
+            if self._model is None:
+                # YOLO non disponible — bascule HSV
+                detections = detect_targets_hsv(cv_image)
+            else:
+                detections = run_detection(
+                    self._model,
+                    cv_image,
+                    conf_threshold=self._conf_threshold,
+                    target_classes=self._target_classes,
+                )
 
         # --- Estimation position monde ---
         drone_pose = (self._drone_x, self._drone_y, self._drone_altitude)

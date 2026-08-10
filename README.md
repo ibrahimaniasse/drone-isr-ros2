@@ -1,7 +1,7 @@
 # 🚁 drone-isr-ros2
 > Autonomous ISR VTOL drone simulation — ROS 2 Jazzy + Gazebo Harmonic + YOLOv8
 
-[![CI](https://github.com/votre_profil/drone-isr-ros2/actions/workflows/ci.yml/badge.svg)](https://github.com/votre_profil/drone-isr-ros2/actions)
+[![CI](https://github.com/ibrahimaniasse/drone-isr-ros2/actions/workflows/ci.yml/badge.svg)](https://github.com/ibrahimaniasse/drone-isr-ros2/actions)
 [![Tests](https://img.shields.io/badge/Tests-25%2F25_Passing-SUCCESS?logo=pytest)](https://docs.pytest.org/)
 [![ROS 2](https://img.shields.io/badge/ROS_2-Jazzy-22314E?logo=ros)](https://docs.ros.org/en/jazzy/)
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python)](https://www.python.org/)
@@ -80,7 +80,7 @@ graph TD
 
 ```bash
 cd ~/ros2_ws/src
-git clone https://github.com/votre_profil/drone-isr-ros2.git
+git clone https://github.com/ibrahimaniasse/drone-isr-ros2.git
 cd ~/ros2_ws
 source /opt/ros/jazzy/setup.bash
 colcon build --symlink-install --packages-select drone_isr
@@ -92,7 +92,7 @@ ros2 launch drone_isr full_mission.launch.py
 *Standalone environment for recruiters without local ROS 2 installation.*
 
 ```bash
-git clone https://github.com/votre_profil/drone-isr-ros2.git
+git clone https://github.com/ibrahimaniasse/drone-isr-ros2.git
 cd drone-isr-ros2/docker
 docker-compose up --build
 ```
@@ -116,3 +116,7 @@ docker-compose up --build
 ## 🏢 About
 
 Ce projet a été conçu pour démontrer une architecture de niveau production pour la robotique logicielle et les systèmes autonomes. Développé principalement pour la simulation tactique UAV, il illustre ma capacité à fusionner les couches mathématiques (génération de trajectoire), réseau (ROS 2/DDS), perception (Computer Vision embarquée) et tooling de simulation en Île-de-France.
+
+## 👤 Author
+
+**Ibrahima NIASSE** — [GitHub](https://github.com/ibrahimaniasse)

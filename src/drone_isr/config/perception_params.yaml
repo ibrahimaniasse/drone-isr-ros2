@@ -2,6 +2,7 @@
 # Fichier séparé car isr_params.yaml contient des sections non-ROS2
 drone_perception:
   ros__parameters:
+    use_hsv_detection: true          # Mode simulation Gazebo (HSV couleur)
     model_name: "yolov8n.pt"
     confidence_threshold: 0.25
     target_classes: ["car", "person", "truck"]
