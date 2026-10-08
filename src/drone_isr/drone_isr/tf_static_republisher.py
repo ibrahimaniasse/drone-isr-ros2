@@ -14,6 +14,7 @@ Transforms publiées (toutes relatives à base_link) :
   base_link → rotor_fl/fr/rl/rr (nacelles VTOL)
   base_link → pusher_prop    (hélice arrière)
 """
+
 import math
 
 import rclpy
@@ -46,27 +47,27 @@ def euler_to_quaternion(roll: float, pitch: float, yaw: float) -> tuple[float, f
 # VTOL Airmobi V35 — 11 links
 STATIC_TRANSFORMS: list[tuple[str, str, tuple[float, ...]]] = [
     # Camera nadir — sous le fuselage, pointant vers le bas
-    ('base_link', 'camera_link', (0.1, 0.0, -0.1, 0.0, 1.5708, 0.0)),
+    ("base_link", "camera_link", (0.1, 0.0, -0.1, 0.0, 1.5708, 0.0)),
     # IMU — centre de masse
-    ('base_link', 'imu_link', (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)),
+    ("base_link", "imu_link", (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)),
     # Aile gauche
-    ('base_link', 'wing_left', (-0.05, 0.38, 0.0, 0.0, 0.0, 0.0)),
+    ("base_link", "wing_left", (-0.05, 0.38, 0.0, 0.0, 0.0, 0.0)),
     # Aile droite
-    ('base_link', 'wing_right', (-0.05, -0.38, 0.0, 0.0, 0.0, 0.0)),
+    ("base_link", "wing_right", (-0.05, -0.38, 0.0, 0.0, 0.0, 0.0)),
     # Empennage V gauche
-    ('base_link', 'tail_left', (-0.58, 0.12, 0.05, 0.0, 0.0, 0.52)),
+    ("base_link", "tail_left", (-0.58, 0.12, 0.05, 0.0, 0.0, 0.52)),
     # Empennage V droit
-    ('base_link', 'tail_right', (-0.58, -0.12, 0.05, 0.0, 0.0, -0.52)),
+    ("base_link", "tail_right", (-0.58, -0.12, 0.05, 0.0, 0.0, -0.52)),
     # Rotor front-left
-    ('base_link', 'rotor_fl', (0.1, 0.65, 0.02, 0.0, 0.0, 0.0)),
+    ("base_link", "rotor_fl", (0.1, 0.65, 0.02, 0.0, 0.0, 0.0)),
     # Rotor front-right
-    ('base_link', 'rotor_fr', (0.1, -0.65, 0.02, 0.0, 0.0, 0.0)),
+    ("base_link", "rotor_fr", (0.1, -0.65, 0.02, 0.0, 0.0, 0.0)),
     # Rotor rear-left
-    ('base_link', 'rotor_rl', (-0.2, 0.65, 0.02, 0.0, 0.0, 0.0)),
+    ("base_link", "rotor_rl", (-0.2, 0.65, 0.02, 0.0, 0.0, 0.0)),
     # Rotor rear-right
-    ('base_link', 'rotor_rr', (-0.2, -0.65, 0.02, 0.0, 0.0, 0.0)),
+    ("base_link", "rotor_rr", (-0.2, -0.65, 0.02, 0.0, 0.0, 0.0)),
     # Hélice pusher arrière
-    ('base_link', 'pusher_prop', (-0.62, 0.0, 0.0, 0.0, 1.5708, 0.0)),
+    ("base_link", "pusher_prop", (-0.62, 0.0, 0.0, 0.0, 1.5708, 0.0)),
 ]
 
 
@@ -74,7 +75,7 @@ class TfStaticPublisher(Node):
     """Publish static transforms for the ISR drone model."""
 
     def __init__(self) -> None:
-        super().__init__('tf_static_republisher')
+        super().__init__("tf_static_republisher")
 
         self.broadcaster = StaticTransformBroadcaster(self)
 
@@ -98,12 +99,10 @@ class TfStaticPublisher(Node):
             t.transform.rotation.w = qw
 
             transforms.append(t)
-            self.get_logger().info(f'Static TF: {parent} -> {child}')
+            self.get_logger().info(f"Static TF: {parent} -> {child}")
 
         self.broadcaster.sendTransform(transforms)
-        self.get_logger().info(
-            f'Published {len(transforms)} static transforms (TRANSIENT_LOCAL)'
-        )
+        self.get_logger().info(f"Published {len(transforms)} static transforms (TRANSIENT_LOCAL)")
 
 
 def main() -> None:

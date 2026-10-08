@@ -2,7 +2,7 @@
 > Autonomous ISR VTOL drone simulation — ROS 2 Jazzy + Gazebo Harmonic + YOLOv8
 
 [![CI](https://github.com/ibrahimaniasse/drone-isr-ros2/actions/workflows/ci.yml/badge.svg)](https://github.com/ibrahimaniasse/drone-isr-ros2/actions)
-[![Tests](https://img.shields.io/badge/Tests-25%2F25_Passing-SUCCESS?logo=pytest)](https://docs.pytest.org/)
+[![Tests](https://img.shields.io/badge/Tests-46%2F46_Passing-SUCCESS?logo=pytest)](https://docs.pytest.org/)
 [![ROS 2](https://img.shields.io/badge/ROS_2-Jazzy-22314E?logo=ros)](https://docs.ros.org/en/jazzy/)
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)

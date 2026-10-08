@@ -8,6 +8,7 @@ Patterns supportés :
   - Lawnmower (boustrophédon) — couverture complète de zone
   - Circulaire — orbite autour d'un point d'intérêt
 """
+
 import math
 from dataclasses import dataclass
 
@@ -26,10 +27,10 @@ class Waypoint:
 class ZoneConfig:
     """Configuration de la zone de surveillance."""
 
-    width: float          # largeur zone en mètres (axe X)
-    height: float         # longueur zone en mètres (axe Y)
-    altitude: float       # altitude de vol en mètres
-    strip_width: float    # largeur de bande effective en mètres
+    width: float  # largeur zone en mètres (axe X)
+    height: float  # longueur zone en mètres (axe Y)
+    altitude: float  # altitude de vol en mètres
+    strip_width: float  # largeur de bande effective en mètres
     overlap: float = 0.2  # overlap entre bandes (20% par défaut)
     origin_x: float = 0.0  # coin bas-gauche X
     origin_y: float = 0.0  # coin bas-gauche Y
@@ -38,11 +39,12 @@ class ZoneConfig:
 @dataclass
 class Obstacle:
     """Obstacle représenté par un cylindre d'exclusion."""
+
     x: float
     y: float
     z: float
-    radius: float      # rayon de sécurité en mètres
-    height: float      # hauteur en mètres
+    radius: float  # rayon de sécurité en mètres
+    height: float  # hauteur en mètres
 
 
 def compute_potential_field_force(
@@ -50,16 +52,17 @@ def compute_potential_field_force(
     obstacles: list[Obstacle],
     repulsion_gain: float = 5.0,
     influence_radius: float = 5.0,
+    tangential_gain: float = 0.0,
 ) -> tuple[float, float, float]:
-    """
-    Calcule la force répulsive totale exercée par les obstacles sur le drone.
-    
+    """Calcule la force répulsive totale exercée par les obstacles sur le drone.
+
     Args:
         position: Position du drone (x, y, z).
         obstacles: Liste des obstacles à éviter.
         repulsion_gain: Force de répulsion (k_rep).
         influence_radius: Distance max à laquelle un obstacle a une influence.
-        
+        tangential_gain: Gain pour le vortex tangentiel de contournement.
+
     Returns:
         (fx, fy, fz) Vecteur de force.
     """
@@ -74,37 +77,41 @@ def compute_potential_field_force(
             continue
 
         dist_to_center = math.hypot(px - obs.x, py - obs.y)
-        
+
         # Distance au bord de l'obstacle de sécurité
         dist_to_edge = dist_to_center - obs.radius
-        
+
         if 0 < dist_to_edge < influence_radius:
             # Force de répulsion (quadratique)
-            force_mag = repulsion_gain * (1.0 / dist_to_edge - 1.0 / influence_radius) * (1.0 / (dist_to_edge**2))
-            
+            force_mag = (
+                repulsion_gain
+                * (1.0 / dist_to_edge - 1.0 / influence_radius)
+                * (1.0 / (dist_to_edge**2))
+            )
+
             # Direction de la force (de l'obstacle vers le drone)
             r_fx = force_mag * (px - obs.x) / dist_to_center
             r_fy = force_mag * (py - obs.y) / dist_to_center
-            
-            # Vortex tangentiel pour glisser autour de l'obstacle (évite le blocage complet)
+
+            # Vortex tangentiel optionnel pour glisser autour de l'obstacle
             t_fx = -r_fy
             t_fy = r_fx
-            
-            fx += r_fx + 0.5 * t_fx
-            fy += r_fy + 0.5 * t_fy
-            
+
+            fx += r_fx + tangential_gain * t_fx
+            fy += r_fy + tangential_gain * t_fy
+
         elif dist_to_edge <= 0:
             # Dans l'obstacle -> répulsion max
             force_mag = repulsion_gain * 100.0
-            r_fx = force_mag * (px - obs.x) / max(0.1, dist_to_center) # eviter /0
+            r_fx = force_mag * (px - obs.x) / max(0.1, dist_to_center)  # eviter /0
             r_fy = force_mag * (py - obs.y) / max(0.1, dist_to_center)
-            
-            # Contournement d'urgence
+
+            # Contournement d'urgence optionnel
             t_fx = -r_fy
             t_fy = r_fx
-            
-            fx += r_fx + 0.5 * t_fx
-            fy += r_fy + 0.5 * t_fy
+
+            fx += r_fx + tangential_gain * t_fx
+            fy += r_fy + tangential_gain * t_fy
 
     return (fx, fy, fz)
 
@@ -119,26 +126,21 @@ def adjust_waypoints_potential_field(
     Ajuste statiquement les waypoints pour repousser la trajectoire des obstacles.
     """
     adjusted = []
-    
+
     for wp in waypoints:
         fx, fy, _ = compute_potential_field_force(
-            (wp.x, wp.y, wp.z), 
-            obstacles, 
-            repulsion_gain=repulsion_gain, 
-            influence_radius=influence_radius
+            (wp.x, wp.y, wp.z),
+            obstacles,
+            repulsion_gain=repulsion_gain,
+            influence_radius=influence_radius,
         )
-        
+
         # On limite le déplacement statique max
         dx = max(-influence_radius, min(fx, influence_radius))
         dy = max(-influence_radius, min(fy, influence_radius))
-        
-        adjusted.append(Waypoint(
-            x=wp.x + dx,
-            y=wp.y + dy,
-            z=wp.z,
-            heading=wp.heading
-        ))
-        
+
+        adjusted.append(Waypoint(x=wp.x + dx, y=wp.y + dy, z=wp.z, heading=wp.heading))
+
     return adjusted
 
 
@@ -293,7 +295,4 @@ def filter_waypoints_outside_zone(
     y_min = zone.origin_y
     y_max = zone.origin_y + zone.height
 
-    return [
-        wp for wp in waypoints
-        if x_min <= wp.x <= x_max and y_min <= wp.y <= y_max
-    ]
+    return [wp for wp in waypoints if x_min <= wp.x <= x_max and y_min <= wp.y <= y_max]

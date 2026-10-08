@@ -16,50 +16,49 @@ Stratégie de détection (simulation Gazebo) :
   3. En mode YOLO, utilise YOLO (fonctionne en conditions réelles).
   Paramètre 'use_hsv_detection: true' force le mode HSV.
 """
+
 import rclpy
+from cv_bridge import CvBridge
+from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from sensor_msgs.msg import Image
-from nav_msgs.msg import Odometry
-from cv_bridge import CvBridge
-
-from drone_isr_msgs.msg import Detection, DetectionArray
 
 from drone_isr.perception_utils import (
-    DetectionResult,
+    detect_targets_hsv,
     draw_detections,
     estimate_world_position,
     run_detection,
-    detect_targets_hsv,
 )
+from drone_isr_msgs.msg import Detection, DetectionArray
 
 
 class DronePerceptionNode(Node):
     """Perception pipeline : camera → YOLOv8 / HSV → detections + annotated image."""
 
     def __init__(self) -> None:
-        super().__init__('drone_perception')
+        super().__init__("drone_perception")
 
         # --- Parameters ---
-        self.declare_parameter('model_name', 'yolov8n.pt')
-        self.declare_parameter('confidence_threshold', 0.50)
-        self.declare_parameter('target_classes', ['car', 'person', 'truck'])
-        self.declare_parameter('camera_fov_h', 1.047)
-        self.declare_parameter('process_every_n_frames', 1)
-        self.declare_parameter('publish_annotated_image', True)
+        self.declare_parameter("model_name", "yolov8n.pt")
+        self.declare_parameter("confidence_threshold", 0.50)
+        self.declare_parameter("target_classes", ["car", "person", "truck"])
+        self.declare_parameter("camera_fov_h", 1.047)
+        self.declare_parameter("process_every_n_frames", 1)
+        self.declare_parameter("publish_annotated_image", True)
         # use_hsv_detection=true → force HSV (simulation Gazebo). False → tente YOLO.
-        self.declare_parameter('use_hsv_detection', True)
+        self.declare_parameter("use_hsv_detection", True)
 
-        self._model_name: str = self.get_parameter('model_name').value
-        self._conf_threshold: float = self.get_parameter('confidence_threshold').value
-        self._target_classes: list[str] = self.get_parameter('target_classes').value
-        self._camera_fov_h: float = self.get_parameter('camera_fov_h').value
-        self._process_every_n: int = self.get_parameter('process_every_n_frames').value
-        self._publish_annotated: bool = self.get_parameter('publish_annotated_image').value
-        self._use_hsv: bool = self.get_parameter('use_hsv_detection').value
+        self._model_name: str = self.get_parameter("model_name").value
+        self._conf_threshold: float = self.get_parameter("confidence_threshold").value
+        self._target_classes: list[str] = self.get_parameter("target_classes").value
+        self._camera_fov_h: float = self.get_parameter("camera_fov_h").value
+        self._process_every_n: int = self.get_parameter("process_every_n_frames").value
+        self._publish_annotated: bool = self.get_parameter("publish_annotated_image").value
+        self._use_hsv: bool = self.get_parameter("use_hsv_detection").value
 
         # --- Lazy model loading ---
         self._model = None
-        self._yolo_unavailable: bool = False   # True si import ultralytics a échoué
+        self._yolo_unavailable: bool = False  # True si import ultralytics a échoué
         self._frame_count: int = 0
         self._bridge = CvBridge()
 
@@ -70,37 +69,43 @@ class DronePerceptionNode(Node):
 
         # --- Subscribers ---
         self.image_sub = self.create_subscription(
-            Image, '/camera/image_raw', self._image_cb, 10,
+            Image,
+            "/camera/image_raw",
+            self._image_cb,
+            10,
         )
         self.odom_sub = self.create_subscription(
-            Odometry, '/odom', self._odom_cb, 10,
+            Odometry,
+            "/odom",
+            self._odom_cb,
+            10,
         )
 
         # --- Publishers ---
-        self.detections_pub = self.create_publisher(DetectionArray, '/detections', 10)
-        self.annotated_pub = self.create_publisher(Image, '/camera/annotated', 10)
+        self.detections_pub = self.create_publisher(DetectionArray, "/detections", 10)
+        self.annotated_pub = self.create_publisher(Image, "/camera/annotated", 10)
 
-        mode_str = 'HSV (simulation)' if self._use_hsv else f'YOLO:{self._model_name}'
+        mode_str = "HSV (simulation)" if self._use_hsv else f"YOLO:{self._model_name}"
         self.get_logger().info(
-            f'Perception node started — mode={mode_str}, '
-            f'conf={self._conf_threshold}, '
-            f'process_every={self._process_every_n}'
+            f"Perception node started — mode={mode_str}, "
+            f"conf={self._conf_threshold}, "
+            f"process_every={self._process_every_n}"
         )
 
     def _load_model(self) -> None:
         """Charge le modèle YOLOv8 au premier appel (lazy loading)."""
         try:
             from ultralytics import YOLO
-            self.get_logger().info(f'Loading YOLOv8 model: {self._model_name}...')
+
+            self.get_logger().info(f"Loading YOLOv8 model: {self._model_name}...")
             self._model = YOLO(self._model_name)
-            self.get_logger().info('YOLOv8 model loaded successfully')
+            self.get_logger().info("YOLOv8 model loaded successfully")
         except ImportError:
-            self.get_logger().warn(
-                'ultralytics not installed — switching to HSV detection mode.')
+            self.get_logger().warn("ultralytics not installed — switching to HSV detection mode.")
             self._yolo_unavailable = True
             self._use_hsv = True
         except Exception as e:
-            self.get_logger().warn(f'YOLOv8 load failed ({e}) — switching to HSV detection.')
+            self.get_logger().warn(f"YOLOv8 load failed ({e}) — switching to HSV detection.")
             self._yolo_unavailable = True
             self._use_hsv = True
 
@@ -120,9 +125,9 @@ class DronePerceptionNode(Node):
 
         # Conversion ROS Image → OpenCV BGR
         try:
-            cv_image = self._bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+            cv_image = self._bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
         except Exception as e:
-            self.get_logger().error(f'cv_bridge conversion failed: {e}')
+            self.get_logger().error(f"cv_bridge conversion failed: {e}")
             return
 
         image_h, image_w = cv_image.shape[:2]
@@ -167,14 +172,14 @@ class DronePerceptionNode(Node):
         # --- Log détections ---
         for det in detections:
             self.get_logger().info(
-                f'Detected: {det.label} (conf={det.confidence:.2f}) '
-                f'at world ({det.world_x:.1f}, {det.world_y:.1f})'
+                f"Detected: {det.label} (conf={det.confidence:.2f}) "
+                f"at world ({det.world_x:.1f}, {det.world_y:.1f})"
             )
 
         # --- Publish DetectionArray ---
         det_array = DetectionArray()
         det_array.header.stamp = msg.header.stamp
-        det_array.header.frame_id = 'camera_link'
+        det_array.header.frame_id = "camera_link"
 
         for det in detections:
             det_msg = Detection()
@@ -196,11 +201,11 @@ class DronePerceptionNode(Node):
         if self._publish_annotated:
             annotated = draw_detections(cv_image, detections)
             try:
-                annotated_msg = self._bridge.cv2_to_imgmsg(annotated, encoding='bgr8')
+                annotated_msg = self._bridge.cv2_to_imgmsg(annotated, encoding="bgr8")
                 annotated_msg.header = msg.header
                 self.annotated_pub.publish(annotated_msg)
             except Exception as e:
-                self.get_logger().error(f'Failed to publish annotated image: {e}')
+                self.get_logger().error(f"Failed to publish annotated image: {e}")
 
 
 def main() -> None:

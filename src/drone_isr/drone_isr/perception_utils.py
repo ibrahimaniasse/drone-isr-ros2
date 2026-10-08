@@ -4,8 +4,9 @@ Logique de perception pure — 0 import ROS2.
 Fonctions de preprocessing, détection YOLOv8, estimation de position monde,
 et overlay OpenCV. Testable sans ROS sourcé.
 """
-from dataclasses import dataclass, field
+
 import math
+from dataclasses import dataclass
 from typing import Any, Optional
 
 import cv2
@@ -39,10 +40,10 @@ class DetectionResult:
 
 # Couleurs par classe pour l'overlay (BGR)
 CLASS_COLORS: dict[str, tuple[int, int, int]] = {
-    'person': (0, 255, 0),      # Vert
-    'car': (255, 100, 0),       # Bleu clair
-    'truck': (255, 0, 100),     # Violet
-    'bicycle': (0, 200, 255),   # Jaune
+    "person": (0, 255, 0),  # Vert
+    "car": (255, 100, 0),  # Bleu clair
+    "truck": (255, 0, 100),  # Violet
+    "bicycle": (0, 200, 255),  # Jaune
 }
 DEFAULT_COLOR: tuple[int, int, int] = (0, 165, 255)  # Orange
 
@@ -90,7 +91,7 @@ def run_detection(
     Returns:
         Liste de DetectionResult filtrées par confiance et classe.
     """
-    results = model(image, device='cpu', conf=conf_threshold, verbose=False)
+    results = model(image, device="cpu", conf=conf_threshold, verbose=False)
 
     detections: list[DetectionResult] = []
 
@@ -101,7 +102,12 @@ def run_detection(
         for box in result.boxes:
             # Extraire les coordonnées xyxy
             coords = box.xyxy[0].cpu().numpy()
-            x_min, y_min, x_max, y_max = int(coords[0]), int(coords[1]), int(coords[2]), int(coords[3])
+            x_min, y_min, x_max, y_max = (
+                int(coords[0]),
+                int(coords[1]),
+                int(coords[2]),
+                int(coords[3]),
+            )
 
             confidence = float(box.conf[0].cpu().numpy())
             class_id = int(box.cls[0].cpu().numpy())
@@ -111,14 +117,16 @@ def run_detection(
             if target_classes is not None and label not in target_classes:
                 continue
 
-            detections.append(DetectionResult(
-                x_min=x_min,
-                y_min=y_min,
-                x_max=x_max,
-                y_max=y_max,
-                label=label,
-                confidence=confidence,
-            ))
+            detections.append(
+                DetectionResult(
+                    x_min=x_min,
+                    y_min=y_min,
+                    x_max=x_max,
+                    y_max=y_max,
+                    label=label,
+                    confidence=confidence,
+                )
+            )
 
     return detections
 
@@ -265,47 +273,42 @@ def filter_low_confidence(
 
 _HSV_TARGETS = [
     {
-        'label': 'vehicle',
-        'conf': 0.82,
-        'ranges': [
+        "label": "vehicle",
+        "conf": 0.82,
+        "ranges": [
             # Bleu
-            (np.array([100, 100, 80],  dtype=np.uint8),
-             np.array([130, 255, 255], dtype=np.uint8)),
+            (np.array([100, 100, 80], dtype=np.uint8), np.array([130, 255, 255], dtype=np.uint8)),
         ],
     },
     {
-        'label': 'vehicle',
-        'conf': 0.85,
-        'ranges': [
+        "label": "vehicle",
+        "conf": 0.85,
+        "ranges": [
             # Rouge (bas)
-            (np.array([0,   100, 80],  dtype=np.uint8),
-             np.array([10,  255, 255], dtype=np.uint8)),
+            (np.array([0, 100, 80], dtype=np.uint8), np.array([10, 255, 255], dtype=np.uint8)),
             # Rouge (haut)
-            (np.array([170, 100, 80],  dtype=np.uint8),
-             np.array([180, 255, 255], dtype=np.uint8)),
+            (np.array([170, 100, 80], dtype=np.uint8), np.array([180, 255, 255], dtype=np.uint8)),
         ],
     },
     {
-        'label': 'vehicle',
-        'conf': 0.70,
-        'ranges': [
+        "label": "vehicle",
+        "conf": 0.70,
+        "ranges": [
             # Gris (faible saturation, valeur moyenne)
-            (np.array([0,   0,  90],  dtype=np.uint8),
-             np.array([180, 40, 180], dtype=np.uint8)),
+            (np.array([0, 0, 90], dtype=np.uint8), np.array([180, 40, 180], dtype=np.uint8)),
         ],
     },
     {
-        'label': 'person',
-        'conf': 0.78,
-        'ranges': [
+        "label": "person",
+        "conf": 0.78,
+        "ranges": [
             # Vert (personnes)
-            (np.array([40,  80, 60],  dtype=np.uint8),
-             np.array([80, 255, 255], dtype=np.uint8)),
+            (np.array([40, 80, 60], dtype=np.uint8), np.array([80, 255, 255], dtype=np.uint8)),
         ],
     },
 ]
 
-_MIN_CONTOUR_AREA = 120   # pixels² — filtre le bruit
+_MIN_CONTOUR_AREA = 120  # pixels² — filtre le bruit
 
 
 def detect_targets_hsv(image: np.ndarray) -> list[DetectionResult]:
@@ -328,13 +331,13 @@ def detect_targets_hsv(image: np.ndarray) -> list[DetectionResult]:
     for target in _HSV_TARGETS:
         # Construire le masque (union de toutes les plages HSV de ce target)
         mask = np.zeros(hsv.shape[:2], dtype=np.uint8)
-        for (lo, hi) in target['ranges']:
+        for lo, hi in target["ranges"]:
             mask |= cv2.inRange(hsv, lo, hi)
 
         # Morphologie pour combler les trous
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN,  kernel)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
 
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
@@ -344,12 +347,16 @@ def detect_targets_hsv(image: np.ndarray) -> list[DetectionResult]:
                 continue
 
             x, y, w, h = cv2.boundingRect(cnt)
-            results.append(DetectionResult(
-                x_min=x, y_min=y,
-                x_max=x + w, y_max=y + h,
-                label=target['label'],
-                confidence=target['conf'],
-            ))
+            results.append(
+                DetectionResult(
+                    x_min=x,
+                    y_min=y,
+                    x_max=x + w,
+                    y_max=y + h,
+                    label=target["label"],
+                    confidence=target["conf"],
+                )
+            )
 
     # Dédupliquer par IoU (même boîte détectée par deux plages de couleur)
     return _nms_detections(results, iou_threshold=0.4)

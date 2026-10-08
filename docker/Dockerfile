@@ -9,6 +9,8 @@ RUN apt-get update && apt-get install -y \
 
 # Install specific Python libraries needed for the project
 RUN pip3 install --no-cache-dir \
+    "setuptools<70" \
+    "packaging>=24.0" \
     pytest \
     numpy \
     pyyaml \
